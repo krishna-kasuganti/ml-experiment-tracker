@@ -76,15 +76,6 @@
     .card-header h2 { font-size: .9rem; font-weight: 600; }
     .card-header .subtitle { font-size: .75rem; color: var(--muted); }
 
-    /* ── Loading spinner ── */
-    #loading-indicator { display: flex; justify-content: center; padding: 2rem; }
-    .spinner {
-      width: 28px; height: 28px; border-radius: 50%;
-      border: 3px solid var(--border); border-top-color: var(--accent);
-      animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     /* ── Table ── */
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
@@ -150,7 +141,6 @@
 
   <div class="card">
     <div class="card-header"><h2>Runs</h2></div>
-    <div id="loading-indicator"><div class="spinner"></div></div>
     <div class="table-wrap">
       <table id="runs-table" hidden>
         <thead>
@@ -191,7 +181,6 @@
   // ── DOM refs ───────────────────────────────────────────────────────────
   const errorBanner      = document.getElementById('error-banner');
   const errorMessage     = document.getElementById('error-message');
-  const loadingIndicator = document.getElementById('loading-indicator');
   const runsTable        = document.getElementById('runs-table');
   const runsTbody        = document.getElementById('runs-tbody');
   const emptyState       = document.getElementById('empty-state');
@@ -229,7 +218,7 @@
 
   function showError(type, msg) {
     errorBanner.dataset.type = type;
-    errorMessage.innerHTML = msg;
+    errorMessage.textContent = msg;
     errorBanner.hidden = false;
   }
 
@@ -237,7 +226,6 @@
 
   // ── Data fetching ──────────────────────────────────────────────────────
   async function fetchData() {
-    loadingIndicator.hidden = false;
     hideError();
 
     let runsResp, expsResp;
@@ -247,33 +235,29 @@
         fetch('/api/database/records/experiments?limit=50&order=created_at.desc'),
       ]);
     } catch (e) {
-      loadingIndicator.hidden = true;
-      showError('connect', 'Cannot reach the local proxy server. Is <code>tracker serve</code> still running?');
+      showError('connect', 'Cannot reach the local proxy server. Is "tracker serve" still running?');
       return;
     }
 
     if (runsResp.status === 401 || expsResp.status === 401) {
-      loadingIndicator.hidden = true;
-      showError('auth', 'Not logged in. Run <code>tracker login</code> in your terminal, then reload.');
+      showError('auth', 'Not logged in. Run "tracker login" in your terminal, then reload.');
       return;
     }
     if (runsResp.status === 502 || expsResp.status === 502) {
-      loadingIndicator.hidden = true;
       const body = await runsResp.json().catch(() => ({}));
       showError('connect', body.message || 'Cannot connect to InsForge. Is it running?');
       return;
     }
     if (!runsResp.ok || !expsResp.ok) {
-      loadingIndicator.hidden = true;
-      const body = await (runsResp.ok ? expsResp : runsResp).json().catch(() => ({}));
-      showError('generic', body.message || `Unexpected error (${runsResp.status})`);
+      const failedResp = runsResp.ok ? expsResp : runsResp;
+      const body = await failedResp.json().catch(() => ({}));
+      showError('generic', body.message || `Unexpected error (${failedResp.status})`);
       return;
     }
 
     allRuns        = await runsResp.json();
     allExperiments = await expsResp.json();
 
-    loadingIndicator.hidden = true;
     lastRefreshed.textContent = 'Updated ' + new Date().toLocaleTimeString();
 
     populateExperimentFilter();
